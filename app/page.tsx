@@ -5,16 +5,19 @@ import { supabase } from '../lib/supabase';
 
 export default function Home() {
   
-const handleSignIn = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-      scopes: 'https://www.googleapis.com/auth/calendar.readonly',
-    },
-  });
-};
-
+  const handleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: [
+          'https://www.googleapis.com/auth/calendar',
+          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/calendar.readonly',
+        ].join(' '),
+      },
+    });
+  };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">

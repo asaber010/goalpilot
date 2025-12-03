@@ -1,158 +1,58 @@
 'use client';
-import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'motion/react';
-import { Children, cloneElement, useEffect, useMemo, useRef, useState, ReactElement, isValidElement } from 'react';
-import './Dock.css';
 
-interface DockItemProps {
-  children: ReactElement[];
-  className?: string;
-  onClick?: () => void;
-  mouseX: any;
-  spring: any;
-  distance: number;
-  magnification: number;
-  baseItemSize: number;
-}
+import { motion } from 'framer-motion';
+import { ReactNode, useState } from 'react';
 
-function DockItem({ children, className = '', onClick, mouseX, spring, distance, magnification, baseItemSize }: DockItemProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isHovered = useMotionValue(0);
-  
-  const mouseDistance = useTransform(mouseX, (val: number) => {
-    const rect = ref.current?.getBoundingClientRect() ?? { x: 0, width: baseItemSize };
-    return val - rect.x - baseItemSize / 2;
-  });
-  
-  const targetSize = useTransform(mouseDistance, [-distance, 0, distance], [baseItemSize, magnification, baseItemSize]);
-  const size = useSpring(targetSize, spring);
-  
-  return (
-    <motion.div
-      ref={ref}
-      style={{ width: size, height: size }}
-      onHoverStart={() => isHovered.set(1)}
-      onHoverEnd={() => isHovered.set(0)}
-      onFocus={() => isHovered.set(1)}
-      onBlur={() => isHovered.set(0)}
-      onClick={onClick}
-      className={`dock-item ${className}`}
-      tabIndex={0}
-      role="button"
-      aria-haspopup="true"
-    >
-      {Children.map(children, child => {
-        if (isValidElement(child)) {
-          return cloneElement(child as ReactElement<any>, { isHovered });
-        }
-        return child;
-      })}
-    </motion.div>
-  );
-}
-
-function DockLabel({ children, className = '', isHovered }: { children: React.ReactNode; className?: string; isHovered?: any }) {
-  const [isVisible, setIsVisible] = useState(false);
-  
-  useEffect(() => {
-    if (!isHovered) return;
-    const unsubscribe = isHovered.on('change', (latest: number) => {
-      setIsVisible(latest === 1);
-    });
-    return () => unsubscribe();
-  }, [isHovered]);
-  
-  return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: 0 }}
-          animate={{ opacity: 1, y: -10 }}
-          exit={{ opacity: 0, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className={`dock-label ${className}`}
-          role="tooltip"
-          style={{ x: '-50%' }}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-function DockIcon({ children, className = '' }: { children: React.ReactNode; className?: string; isHovered?: any }) {
-  return <div className={`dock-icon ${className}`}>{children}</div>;
+interface DockItem {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
 }
 
 interface DockProps {
-  items: Array<{
-    icon: React.ReactNode;
-    label: string;
-    onClick: () => void;
-    className?: string;
-  }>;
-  className?: string;
-  spring?: { mass: number; stiffness: number; damping: number };
-  magnification?: number;
-  distance?: number;
-  panelHeight?: number;
-  dockHeight?: number;
-  baseItemSize?: number;
+  items: DockItem[];
 }
 
-export default function Dock({
-  items,
-  className = '',
-  spring = { mass: 0.1, stiffness: 150, damping: 12 },
-  magnification = 70,
-  distance = 200,
-  panelHeight = 68,
-  dockHeight = 256,
-  baseItemSize = 50
-}: DockProps) {
-  const mouseX = useMotionValue(Infinity);
-  const isHovered = useMotionValue(0);
-  
-  const maxHeight = useMemo(
-    () => Math.max(dockHeight, magnification + magnification / 2 + 4),
-    [magnification, dockHeight]
-  );
-  
-  const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
-  const height = useSpring(heightRow, spring);
-  
+export default function Dock({ items }: DockProps) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   return (
-    <motion.div style={{ height, scrollbarWidth: 'none' }} className="dock-outer">
-      <motion.div
-        onMouseMove={({ pageX }) => {
-          isHovered.set(1);
-          mouseX.set(pageX);
-        }}
-        onMouseLeave={() => {
-          isHovered.set(0);
-          mouseX.set(Infinity);
-        }}
-        className={`dock-panel ${className}`}
-        style={{ height: panelHeight }}
-        role="toolbar"
-        aria-label="Application dock"
-      >
+    <motion.div 
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.5, duration: 0.4 }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
+    >
+      <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
         {items.map((item, index) => (
-          <DockItem
+          <motion.button
             key={index}
+            onHoverStart={() => setHoveredIndex(index)}
+            onHoverEnd={() => setHoveredIndex(null)}
+            whileHover={{ scale: 1.15, y: -8 }}
+            whileTap={{ scale: 0.95 }}
             onClick={item.onClick}
-            className={item.className}
-            mouseX={mouseX}
-            spring={spring}
-            distance={distance}
-            magnification={magnification}
-            baseItemSize={baseItemSize}
+            className="relative w-12 h-12 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] flex items-center justify-center transition-colors group"
           >
-            <DockIcon>{item.icon}</DockIcon>
-            <DockLabel>{item.label}</DockLabel>
-          </DockItem>
+            {item.icon}
+            
+            {/* Tooltip */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ 
+                opacity: hoveredIndex === index ? 1 : 0, 
+                y: hoveredIndex === index ? 0 : 10 
+              }}
+              className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-sm text-white text-xs whitespace-nowrap pointer-events-none"
+            >
+              {item.label}
+            </motion.div>
+
+            {/* Glow effect on hover */}
+            <div className="absolute inset-0 rounded-xl bg-purple-500/0 group-hover:bg-purple-500/20 transition-colors" />
+          </motion.button>
         ))}
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
